@@ -1,0 +1,7 @@
+*.xlsx
+**/__pycache__
+.vscode/
+.idea/
+
+venv/*
+!venv/.gitkeep
