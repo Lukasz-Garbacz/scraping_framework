@@ -1,2 +1,6 @@
+from client import RawClient
+
+
 if __name__ == '__main__':
-    pass
+    client = RawClient()
+    print(client.fetch_one('http://google.com'))

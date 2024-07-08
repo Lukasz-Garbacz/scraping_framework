@@ -7,9 +7,9 @@ from requests.adapters import HTTPAdapter, Retry, Response
 from tenacity import retry, stop_after_attempt, wait_fixed
 from urllib.request import getproxies
 
-from .http_error_handler import retry_if_http_429_error, wait_for_retry_after_header
-from .settings import Settings as st
-from .exceptions import NoDataError
+from http_429_handler import retry_http_429, wait_after_header
+from settings import Settings as st
+from exceptions import NoDataError
 
 
 class RawClient:
@@ -32,20 +32,20 @@ class RawClient:
 
 
     @retry(
-            retry=retry_if_http_429_error(),
-            wait=wait_for_retry_after_header(fallback=wait_fixed(60)),
+            retry=retry_http_429(),
+            wait=wait_after_header(fallback=wait_fixed(60)),
             stop=stop_after_attempt(5)
             )
     def fetch_one(self, website_address: str, params_dict: dict = {}) -> Response:
         """Download website and return response content, wait if HTTP 429 error.
 
         Keyword arguments:
-            website_address -- full address of website to download, including 'http://'
+            website_address -- full address of website to download, including 'http://', 
             params_dict [optional] -- parameters to add to the GET request for RestAPI compatibility
         Return value:
             .content parameter of requests.adapters.Response class
         Exceptions raised:
-            NoDataError -- raised when server response content is empty
+            NoDataError -- raised when server response content is empty, 
             requests.HTTPError -- raised when a HTTP error is returned by server
         """
         response = self.session.get(
@@ -81,7 +81,7 @@ class RawClient:
         for website in website_address:
             try:
                 responce_list.append(self.fetch_one(params_dict, website))
-            except Exception as exc:
+            except (NoDataError, requests.HTTPError) as exc:
                 pass
             if stop_on_exc:
                 return responce_list
