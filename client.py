@@ -7,7 +7,7 @@ from requests.adapters import HTTPAdapter, Retry, Response
 from tenacity import retry, stop_after_attempt, wait_fixed
 from urllib.request import getproxies
 
-from http_429_handler import retry_http_429, wait_after_header
+from http_429_handler import retry_http_429, wait_after_http_429
 from settings import Settings as st
 from exceptions import NoDataError
 
@@ -33,7 +33,7 @@ class RawClient:
 
     @retry(
             retry=retry_http_429(),
-            wait=wait_after_header(fallback=wait_fixed(60)),
+            wait=wait_after_http_429(fallback=wait_fixed(60)),
             stop=stop_after_attempt(5)
             )
     def fetch_one(self, website_address: str, params_dict: dict = {}) -> Response:
