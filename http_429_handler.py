@@ -18,7 +18,7 @@ class retry_http_429(retry_if_exception):
         super().__init__(predicate=self.is_http_429_error)
 
 
-class wait_after_http_429(wait_base):
+class wait_after_header(wait_base):
     """Wait strategy that tries to wait for the length specified by
     the Retry-After header, or the underlying wait strategy if not.
 

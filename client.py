@@ -7,7 +7,7 @@ from requests.adapters import HTTPAdapter, Retry, Response
 from tenacity import retry, stop_after_attempt, wait_fixed
 from urllib.request import getproxies
 
-from http_429_handler import retry_http_429, wait_after_http_429
+from http_handler import JSONParser, get_wait_strat, retry_if_http_error
 from settings import Settings as st
 from exceptions import NoDataError
 
@@ -32,9 +32,9 @@ class RawClient:
 
 
     @retry(
-            retry=retry_http_429(),
-            wait=wait_after_http_429(fallback=wait_fixed(60)),
-            stop=stop_after_attempt(5)
+            retry= retry_if_http_error(),
+            wait= get_wait_strat(),
+            stop=stop_after_attempt(JSONParser.handling_policy['max_retries'])
             )
     def fetch_one(self, website_address: str, params_dict: dict = {}) -> Response:
         """Download website and return response content, wait if HTTP 429 error.
@@ -60,12 +60,17 @@ class RawClient:
         return response.content
 
 
-    def fetch_all(self, params_dict: dict, website_address, wait_download: int = 0, stop_on_exc: bool = False) -> list:
+    @retry(
+            retry= retry_if_http_error(),
+            wait= get_wait_strat(),
+            stop=stop_after_attempt(JSONParser.get_params['max_retries'])
+            )
+    def fetch_all(self, params_dict: dict, website_addresses, wait_download: int = 0, stop_on_exc: bool = False) -> list:
         """Download list of websites using the fetch_one method.
 
          Keyword arguments:
             params_dict [optional] -- parameters to add to the GET request for RestAPI compatibility
-            website_address -- list of full addresses of websites to download, including 'http://'
+            website_addresses -- list of full addresses of websites to download, including 'http://'
             wait_download -- number of seconds to wait between downloads (default 0)
             stop_on_exc -- bool if method should stop on first exception thrown (default False)
         Return value:
@@ -75,10 +80,13 @@ class RawClient:
             requests.HTTPError -- raised when a HTTP error is returned by server
         """
         responce_list = []
-        if not isinstance(website_address, list):
-            website_address = [website_address]
+        if not isinstance(website_addresses, list):
+            try:
+                website_addresses = [website_addresses]
+            except TypeError:
+                raise Exception(f'Wrong format of website_addresses variable, accepted formats: str, list. Given format: {type(website_addresses)}')
 
-        for website in website_address:
+        for website in website_addresses:
             try:
                 responce_list.append(self.fetch_one(params_dict, website))
             except (NoDataError, requests.HTTPError) as exc:

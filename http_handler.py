@@ -21,6 +21,7 @@ class JSONParser:
         with open(st.http_handling_path) as json_file:
             self.json_file = json.load(json_file)
     
+    @classmethod
     def get_params(self, error_code: int) -> None:
         try:
             default_dict = self.json_file['default_policy']
@@ -31,7 +32,7 @@ class JSONParser:
         #wait_strategy
         try:
             if error_dict['wait_strategy'] == 'wait_after_header':
-                self.handling_policy['wait_strategy'] = wait_after_header
+                self.handling_policy['wait_strategy'] = get_wait_strat
             else:
                 raise KeyError
         except KeyError:
@@ -59,39 +60,36 @@ class JSONParser:
             self.handling_policy['max_retries'] = default_dict['max_retries']
 
 
-class wait_after_header(wait_base):
+class get_wait_strat(wait_base):
     """Wait strategy that tries to wait for the length specified by
     the Retry-After header, or the underlying wait strategy if not.
 
     Otherwise, wait according to the fallback strategy.
     """
-    fallback: wait_fixed
 
-    def __init__(self, fallback: wait_fixed) -> None:
-        self.fallback = fallback
+    def __init__(self) -> None:
+        pass
 
     def __call__(self, retry_state: RetryCallState) -> int:
         exc = retry_state.outcome.exception()
-        error_code = exc.getcode()
-        #TODO TUTAJ CHYBA DODAC PARAMSY 
-        if isinstance(exc, urllib.error.HTTPError):
+        params_dict = JSONParser.get_params(error_code= exc.getcode())
+        #TODO TUTAJ CHYBA DODAC PARAMSY
+        #wait strategy
+        if params_dict['wait_strategy'] == 'wait_after_header':
             retry_after = exc.headers.get("Retry-After")
-            try:
-                return int(retry_after)
-            except (TypeError, ValueError):
-                pass
+        elif isinstance(params_dict['wait_strategy'], wait_fixed):
+            retry_after = params_dict['wait_strategy'](params_dict['wait_time'])
+        try:
+            return int(retry_after)
+        except (TypeError, ValueError):
+            #fallback strategy
+            return params_dict['fallback_wait'](params_dict['wait_time'])
 
-        return self.fallback(retry_state)
 
 class retry_if_http_error(retry_if_exception):
-    """Retry strategy that retries if the exception is an ``HTTPError`` with
-    a 429 status code.
-
+    """Retry strategy that retries if the exception is an ``HTTPError``
     """
-    def is_http_429_error(exception):
-            return (
-                    isinstance(exception, urllib.error.HTTPError)  #and
-                    #exception.getcode() == 429
-                    )
+    def is_http_error(exception):
+            return isinstance(exception, urllib.error.HTTPError)
     def __init__(self) -> None:
-        super().__init__(predicate=self.is_http_429_error)
+        super().__init__(predicate=self.is_http_error)
