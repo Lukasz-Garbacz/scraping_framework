@@ -4,10 +4,9 @@ import urllib3
 
 from time import sleep
 from requests.adapters import HTTPAdapter, Retry, Response
-from tenacity import retry, stop_after_attempt, wait_fixed
+from retry_decorator import http_retry
 from urllib.request import getproxies
 
-from http_handler import JSONParser, get_wait_strat, retry_if_http_error
 from settings import Settings as st
 from exceptions import NoDataError
 
@@ -21,21 +20,21 @@ class RawClient:
             pd.set_option('future.no_silent_downcasting', True)
             urllib3.disable_warnings()
             self.session.trust_env= False
-        retries = Retry(
-                        total=5,
-                        backoff_factor=0.1,
-                        status_forcelist=[407, 500, 502, 503, 504]
-                        )
+        if st.default_retries:
+            retries = Retry(
+                            total=5,
+                            backoff_factor=0.1,
+                            status_forcelist=[407, 500, 502, 503, 504],
+                            respect_retry_after_header= True
+                            )
+        else:
+            retries = None
         self.session.mount('http://', HTTPAdapter(max_retries=retries))
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
         self.session.headers.update({'user-agent': 'scraper'})
 
 
-    @retry(
-            retry= retry_if_http_error(),
-            wait= get_wait_strat(),
-            stop=stop_after_attempt(JSONParser.handling_policy['max_retries'])
-            )
+    @http_retry
     def fetch_one(self, website_address: str, params_dict: dict = {}) -> Response:
         """Download website and return response content, wait if HTTP 429 error.
 
@@ -60,11 +59,7 @@ class RawClient:
         return response.content
 
 
-    @retry(
-            retry= retry_if_http_error(),
-            wait= get_wait_strat(),
-            stop=stop_after_attempt(JSONParser.get_params['max_retries'])
-            )
+    @http_retry
     def fetch_all(self, params_dict: dict, website_addresses, wait_download: int = 0, stop_on_exc: bool = False) -> list:
         """Download list of websites using the fetch_one method.
 

@@ -1,4 +1,5 @@
 from client import RawClient
+from retry_decorator import retry
 
 
 if __name__ == '__main__':

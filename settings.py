@@ -8,4 +8,6 @@ class Settings:
     }
     file_save_path = ''
     http_handling_path = './http_handling_policies.json'
+
     disable_safety = True #disable https cert validation and safety warnings
+    default_retries = False #if True use requests.adapters.Retry, if False use retry_decorator
