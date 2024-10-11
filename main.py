@@ -1,7 +1,7 @@
 from client import RawClient
-from retry_decorator import retry
+from retry_decorator import http_retry
 
 
 if __name__ == '__main__':
     client = RawClient()
-    print(client.fetch_one('http://google.com'))
+    print(client.get_one('https://www.geeksforgeeks.org/decorators-in-python/'))

@@ -1,24 +1,18 @@
-from io import TextIOWrapper
 from time import sleep
 import urllib.error
 import urllib.request
-import json
 
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_fixed, RetryCallState
-from tenacity.wait import wait_base
-
-from settings import Settings as st
 from http_handler import JSONParser
 from exceptions import MaxRetriesExceeded
 
 def http_retry(func):
-    def inner1():
+    def inner1(*args, **kwargs):
         wait_time = None
         retries = 0
         max_retries = 1
         while retries < max_retries:
             try:
-                func()
+                return_value = func(*args, **kwargs)
                 break
             except urllib.error.HTTPError as exc:
                 params_dict = JSONParser(exc).handling_policy
@@ -34,6 +28,7 @@ def http_retry(func):
                 sleep(wait_time)
                 retries += 1
             raise MaxRetriesExceeded(f'Retries exceeded: {max_retries}')
+        return return_value
             
 
     return inner1

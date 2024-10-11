@@ -35,20 +35,20 @@ class RawClient:
 
 
     @http_retry
-    def fetch_one(self, website_address: str, params_dict: dict = {}) -> Response:
+    def get_one(self, url: str, params_dict: dict = {}) -> Response.content:
         """Download website and return response content, wait if HTTP 429 error.
 
         Keyword arguments:
-            website_address -- full address of website to download, including 'http://', 
-            params_dict [optional] -- parameters to add to the GET request for RestAPI compatibility
+            url -- full address of website to download, including 'http://'
+            params_dict [optional, Default: {}] -- parameters to add to the GET request for RestAPI compatibility
         Return value:
-            .content parameter of requests.adapters.Response class
+            requests.adapters.Response.content
         Exceptions raised:
             NoDataError -- raised when server response content is empty, 
             requests.HTTPError -- raised when a HTTP error is returned by server
         """
         response = self.session.get(
-                            website_address
+                            url
                             ,params= params_dict
                             ,verify= False if st.disable_safety else True
                             ,proxies= getproxies()
@@ -59,34 +59,60 @@ class RawClient:
         return response.content
 
 
-    @http_retry
-    def fetch_all(self, params_dict: dict, website_addresses, wait_download: int = 0, stop_on_exc: bool = False) -> list:
+    def get_all(self, urls, params_dict: dict = {}, wait_download: int = 0, stop_on_exc: bool = False) -> list[Response.content]:
         """Download list of websites using the fetch_one method.
 
          Keyword arguments:
-            params_dict [optional] -- parameters to add to the GET request for RestAPI compatibility
-            website_addresses -- list of full addresses of websites to download, including 'http://'
-            wait_download -- number of seconds to wait between downloads (default 0)
-            stop_on_exc -- bool if method should stop on first exception thrown (default False)
+            urls -- list of full addresses of websites to download, including 'http://'
+            params_dict [optional, Default: {}] -- parameters to add to the GET request for RestAPI compatibility
+            wait_download [optional, Default: 0] -- number of seconds to wait between downloads (default 0)
+            stop_on_exc [optional, Default: False] -- bool if method should stop on first exception thrown (default False)
         Return value:
-            list of .content parameters of requests.adapters.Response class
+            list of requests.adapters.Response.content parameters
         Exceptions raised (only when stop_on_exc is set to True):
             NoDataError -- raised when server response content is empty
             requests.HTTPError -- raised when a HTTP error is returned by server
         """
         responce_list = []
-        if not isinstance(website_addresses, list):
+        if not isinstance(urls, list):
             try:
-                website_addresses = [website_addresses]
+                urls = [urls]
             except TypeError:
-                raise Exception(f'Wrong format of website_addresses variable, accepted formats: str, list. Given format: {type(website_addresses)}')
+                raise Exception(f'Wrong format of urls variable, accepted formats: str, list. Given format: {type(urls)}')
 
-        for website in website_addresses:
+        for website in urls:
             try:
-                responce_list.append(self.fetch_one(params_dict, website))
+                responce_list.append(self.get_one(params_dict, website))
             except (NoDataError, requests.HTTPError) as exc:
                 pass
             if stop_on_exc:
                 return responce_list
             sleep(wait_download)
         return responce_list
+
+    @http_retry
+    def post_one(self, url: str, cert = None, data_dict: dict = None, json_dict: dict = None, auth: tuple = None) -> Response.content:
+        """Download website and return response content, wait if HTTP 429 error.
+        Keyword arguments:
+            url -- full address of website to download, including 'http://'
+            cert [optional, Default: None] -- string or tuple specifying a cert file or key
+            data_dict [optional, Default: None] -- dictionary object to send to the specified url
+            json_dict [optional, Default: None] -- JSON object to send to the specified url
+        Return value:
+            requests.adapters.Response.content
+        Exceptions raised:
+            NoDataError -- raised when server response content is empty, 
+            requests.HTTPError -- raised when a HTTP error is returned by server
+        """
+        response = self.session.post(
+                            url
+                            ,data= data_dict
+                            ,verify= False if st.disable_safety else True
+                            ,proxies= getproxies()
+                            ,cert= cert
+                            ,json= json_dict
+                            )
+        response.raise_for_status()
+        if len(response.content) == 0:
+                    raise NoDataError
+        return response.content
